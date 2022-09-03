@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="zh-Hans"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta name="description" content="为何mysql使用b+树作为索引"><meta name="keywords" content="mysql"><meta name="author" content="Aroad阿路"><meta name="copyright" content="Aroad阿路"><title>为何mysql使用b+树作为索引 | 阿路胡言乱语的小栈</title><link rel="shortcut icon" href="/melody-favicon.ico"><link rel="stylesheet" href="/css/index.css?version=1.9.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@latest/css/font-awesome.min.css?version=1.9.0"><meta name="format-detection" content="telephone=no"><meta http-equiv="x-dns-prefetch-control" content="on"><link rel="dns-prefetch" href="https://cdn.jsdelivr.net"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><script src="https://v1.hitokoto.cn/?encode=js&amp;charset=utf-8&amp;select=.footer_custom_text" defer></script><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  hexoVersion: '5.4.0'
+} </script><meta name="generator" content="Hexo 5.4.0"></head><body><i class="fa fa-arrow-right" id="toggle-sidebar" aria-hidden="true"></i><div id="sidebar" data-display="true"><div class="toggle-sidebar-info text-center"><span data-toggle="切换文章详情">切换站点概览</span><hr></div><div class="sidebar-toc"><div class="sidebar-toc__title">目录</div><div class="sidebar-toc__progress"><span class="progress-notice">你已经读了</span><span class="progress-num">0</span><span class="progress-percentage">%</span><div class="sidebar-toc__progress-bar"></div></div><div class="sidebar-toc__content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%BD%BF%E7%94%A8B-Tree%E4%BD%9C%E4%B8%BA%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B4%A2%E5%BC%95"><span class="toc-number">1.</span> <span class="toc-text">为何使用B+Tree作为数据库索引</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%B8%8D%E7%94%A8%E5%93%88%E5%B8%8C%EF%BC%88Hash-Table%EF%BC%89"><span class="toc-number">1.1.</span> <span class="toc-text">为何不用哈希（Hash Table）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%B8%8D%E4%BD%BF%E7%94%A8%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2-%E6%8E%92%E5%BA%8F-%E6%A0%91-BTS"><span class="toc-number">1.2.</span> <span class="toc-text">为何不使用二叉搜索(排序)树(BTS)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%B8%8D%E4%BD%BF%E7%94%A8%E8%87%AA%E5%B9%B3%E8%A1%A1%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91"><span class="toc-number">1.3.</span> <span class="toc-text">为何不使用自平衡二叉搜索树</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#AVL%E6%A0%91-Adelson-Velsky-and-Landis-Tree"><span class="toc-number">1.3.1.</span> <span class="toc-text">AVL树(Adelson-Velsky and Landis Tree)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%B8%8D%E4%BD%BF%E7%94%A8%E7%BA%A2%E9%BB%91%E6%A0%91-Red-Black-Tree"><span class="toc-number">1.3.2.</span> <span class="toc-text">为何不使用红黑树(Red&#x2F;Black Tree)</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#B%E6%A0%91-B-Tree"><span class="toc-number">1.4.</span> <span class="toc-text">B树(B-Tree)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#B-%E6%A0%91"><span class="toc-number">1.5.</span> <span class="toc-text">B+树</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E6%98%AFB-%E8%80%8C%E4%B8%8D%E6%98%AFB"><span class="toc-number">1.6.</span> <span class="toc-text">为何是B+而不是B</span></a></li></ol></li></ol></div></div><div class="author-info hide"><div class="author-info__avatar text-center"><img src="https://aroad.top/demo/avagar.jpg"></div><div class="author-info__name text-center">Aroad阿路</div><div class="author-info__description text-center">一个phper</div><hr><div class="author-info-articles"><a class="author-info-articles__archives article-meta" href="/archives"><span class="pull-left">文章</span><span class="pull-right">8</span></a><a class="author-info-articles__tags article-meta" href="/tags"><span class="pull-left">标签</span><span class="pull-right">8</span></a><a class="author-info-articles__categories article-meta" href="/categories"><span class="pull-left">分类</span><span class="pull-right">1</span></a></div><hr><div class="author-info-links"><div class="author-info-links__title text-center">Links</div><a class="author-info-links__name text-center" target="_blank" rel="noopener" href="https://leckkk.github.io">194单身青年</a></div></div></div><div id="content-outer"><div id="top-container" style="background-image: url(https://aroad.top/demo/banner2.png)"><div id="page-header"><span class="pull-left"> <a id="site-name" href="/">阿路胡言乱语的小栈</a></span><i class="fa fa-bars toggle-menu pull-right" aria-hidden="true"></i><span class="pull-right menus">   <a class="site-page" href="/">Home</a><a class="site-page" href="/archives">Archives</a><a class="site-page" href="/tags">Tags</a><a class="site-page" href="/categories">Categories</a></span><span class="pull-right"></span></div><div id="post-info"><div id="post-title">为何mysql使用b+树作为索引</div><div id="post-meta"><time class="post-meta__date"><i class="fa fa-calendar" aria-hidden="true"></i> 2022-09-03</time></div></div></div><div class="layout" id="content-inner"><article id="post"><div class="article-container" id="post-content"><h2 id="为何使用B-Tree作为数据库索引"><a href="#为何使用B-Tree作为数据库索引" class="headerlink" title="为何使用B+Tree作为数据库索引"></a>为何使用B+Tree作为数据库索引</h2><p>首先贴一个各种数据结构的一个演示网站<a target="_blank" rel="noopener" href="https://www.cs.usfca.edu/~galles/visualization/Algorithms.html">USF Data Structure Visualizations</a></p>
+<hr>
+<h3 id="为何不用哈希（Hash-Table）"><a href="#为何不用哈希（Hash-Table）" class="headerlink" title="为何不用哈希（Hash Table）"></a>为何不用哈希（Hash Table）</h3><p>首先第一个问题 为何不用hash？</p>
+<p>直接说答案 因为范围查找不方便以及存在hash碰撞</p>
+<p>比如有以下数组<code>[1,14,5,6,7,28,21,40]</code> 我们设计一个简单的hash函数如 n % 13 </p>
+<p>那么便会存在以下情况（第一行为key）</p>
+<table>
+<thead>
+<tr>
+<th>0(key)</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+<th>7</th>
+<th>8</th>
+<th>9</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td>1</td>
+<td>28</td>
+<td></td>
+<td></td>
+<td>5</td>
+<td>6</td>
+<td>7</td>
+<td>21</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>14</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>40</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>当我们在找21时那非常的简单 21% 13 = 8 找key为8就好，而查找40时则会返回一串 1，14，40而后需要遍历对比查找才能找到40，这便是所谓的hash碰撞，并且也不适用于范围查找比如查找返回大于20的值。</p>
+<p>但hash的查找速度理论上是最快的为 O(1)</p>
+<hr>
+<h3 id="为何不使用二叉搜索-排序-树-BTS"><a href="#为何不使用二叉搜索-排序-树-BTS" class="headerlink" title="为何不使用二叉搜索(排序)树(BTS)"></a>为何不使用二叉搜索(排序)树(BTS)</h3><p>首先理解二叉搜索树的概念具体可以看 <a target="_blank" rel="noopener" href="https://zh.wikipedia.org/zh-cn/%E4%BA%8C%E5%85%83%E6%90%9C%E5%B0%8B%E6%A8%B9">BTS wiki</a></p>
+<p>提炼一下就是</p>
+<ol>
+<li>若任意节点的左子树不空，则左子树上所有节点的值均小于它的根节点的值；</li>
+<li>若任意节点的右子树不空，则右子树上所有节点的值均大于它的根节点的值；</li>
+<li>任意节点的左、右子树也分别为二叉查找树；</li>
+</ol>
+<p>上图</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/yvZicIKYxM.png!large" alt="image-20220902174340111"></p>
+<p>如图 比如需要查找 6 那么顺序便会是 10 -&gt; 5 -&gt; 6 具体便是</p>
+<ol>
+<li>6 与 10比较 6 &lt; 10那么向左节点查找</li>
+<li>6与 5比较 6 &gt; 10 那么向右节点查找</li>
+<li>6与 6比较 查找到了返回</li>
+</ol>
+<p>那么这个树有什么问题吗，有 如果我插入 1， 2，3，4，5，6那么就会成为</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/s43CW5eKur.png!large" alt="image-20220902174655460"></p>
+<p>那么如果我现在要查6 就需要6步 </p>
+<p>那么最坏的时间复杂度则是O(n) n代表树的高度</p>
+<h3 id="为何不使用自平衡二叉搜索树"><a href="#为何不使用自平衡二叉搜索树" class="headerlink" title="为何不使用自平衡二叉搜索树"></a>为何不使用自平衡二叉搜索树</h3><h4 id="AVL树-Adelson-Velsky-and-Landis-Tree"><a href="#AVL树-Adelson-Velsky-and-Landis-Tree" class="headerlink" title="AVL树(Adelson-Velsky and Landis Tree)"></a>AVL树(Adelson-Velsky and Landis Tree)</h4><p>先上概念<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/AVL%E6%A0%91">AVL树wiki</a></p>
+<p>重点在于，在AVL树中，任一节点对应的两棵子树的最大高度差为1</p>
+<p>很简单便是 如果你插入 1，2，3</p>
+<p>就会从这样</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/5B3tiV2STn.png!large" alt="image-20220902175633047"></p>
+<p>而后1左旋成</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/vdMWIepMkZ.png!large" alt="image-20220902175550025"></p>
+<p>这样（绝对的0卡）</p>
+<p>还不明白的那就去<a target="_blank" rel="noopener" href="https://www.cs.usfca.edu/~galles/visualization/AVLtree.html">链接</a>这里自己多试几次</p>
+<p>AVL树的查找时间复杂度为O(log n)具体推导过程可以自行网上查一查</p>
+<p>但AVL树有个问题，我查找起来是比BTS的极端情况快了很多 但我插入删除左旋转右旋转太麻烦了</p>
+<p>怎么办？</p>
+<h4 id="为何不使用红黑树-Red-Black-Tree"><a href="#为何不使用红黑树-Red-Black-Tree" class="headerlink" title="为何不使用红黑树(Red/Black Tree)"></a>为何不使用红黑树(Red/Black Tree)</h4><p>先贴概念<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E7%BA%A2%E9%BB%91%E6%A0%91">红黑树wiki</a></p>
+<p>其他红黑的概念暂时不提</p>
+<p>重点：从根到叶子的最长的可能路径不多于最短的可能路径的两倍长。</p>
+<p>也就是说 之前AVL必须保证最长路径与最短路径差距小于等于1，现在变成两倍了</p>
+<p>那么就减少了他插入/删除时一定的旋转次数</p>
+<p>就比如插入[1,2,3,4,5,6]</p>
+<p>AVL需要旋转3次 而红黑只需要旋转2次 数据量大则会体现的更明显</p>
+<p>其时间复杂度同样也是O(log n)</p>
+<p>但是如果使用红黑树仍会存在一个问题，那便是数据量过大会导致树的高度过高，是需要比较的次数过多，而每次比较便是一次磁盘的IO，要是找一个深一点的元素那得等麻了。</p>
+<h3 id="B树-B-Tree"><a href="#B树-B-Tree" class="headerlink" title="B树(B-Tree)"></a>B树(B-Tree)</h3><p>先贴概念<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/B%E6%A0%91">B树wiki</a> 或者是<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/B%E6%A0%91/5411672?fr=kg_general">B树百度百科</a></p>
+<p>重点：B树，概括来说是一个一般化的<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E4%BA%8C%E5%85%83%E6%90%9C%E5%B0%8B%E6%A8%B9">二叉查找树</a>（binary search tree）一个节点可以拥有2个以上的子节点</p>
+<p>因为二叉树会导致层数过高 那么我增加树的一个节点的可以存放数据的量再多加几个分出去的叉就能让层数有效减少了啊</p>
+<p>先看看B树的几个特点</p>
+<p>一棵m阶B树(balanced tree of order m)是一棵平衡的m路搜索树。它或者是空树，或者是满足下列性质的树：</p>
+<ol>
+<li>根结点至少有两个子女；</li>
+<li>每个非根节点所包含的关键字个数 j 满足：┌m/2┐ - 1 &lt;= j &lt;= m - 1；</li>
+<li>除根结点以外的所有结点（不包括叶子结点）的度数正好是关键字总数加1，故<strong>内部子树</strong>个数 k 满足：┌m/2┐ &lt;= k &lt;= m ；</li>
+<li>所有的叶子结点都位于同一层。</li>
+</ol>
+<p>好，以一个阶（度）为5的B树为例</p>
+<p>翻译一下上面的话</p>
+<p>根节点内的元素个数区间[1,4] （1≤ 元素个数 ≤ 4 后面就不翻译了 ）</p>
+<p>根节点的子节点（分叉线）个数区间[2,5]</p>
+<p>内节点（就是介于最上层与最下层之间的节点）的子节点（分叉线）个数区间[3,5]</p>
+<p>非根节点内元素个数区间[2,4]</p>
+<p>然后来插入 [1,2,3,4,5]</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/SECZPju1u2.png!large" alt="image-20220902190102923"></p>
+<p>插入1-4时会同为一个根节点</p>
+<p>继续插入5时因为超过根节点内元素个数从而将中间数3取出作为新的根节点 【1，2】【4，5】作为他的两个子节点</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/tsk7KWwA0c.png!large" alt="image-20220902190452460"></p>
+<p>继续往下插入</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/7YIIgFKp1N.png!large" alt="image-20220902190520684"></p>
+<p>插入到8时则会再次取中间数6分裂为两个子节点再将6与父节点3合并 注意看具体线引出的位置</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/YrJChOYmxj.png!large" alt="image-20220902190633559"></p>
+<p>这个分叉的线实际为指针指向，也是要占用空间的 其保证 3与6之间的子节点的元素值区间为(3 , 6)</p>
+<p>B树其他的便特性便先不讲</p>
+<p>先看看B+树的特性而后再说为何mysql会使用B+树做索引</p>
+<h3 id="B-树"><a href="#B-树" class="headerlink" title="B+树"></a>B+树</h3><p>B+树其实是B树的一种改进版 <a target="_blank" rel="noopener" href="https://zh.m.wikipedia.org/zh-cn/B%2B%E6%A0%91">B+树wiki</a> 与 <a target="_blank" rel="noopener" href="https://baike.baidu.com/item/B%2B%E6%A0%91?fromModule=lemma_search-box">B+树百度百科</a></p>
+<p>重点特性</p>
+<ol>
+<li>每个结点至多有m个子女；</li>
+<li>除根结点外，每个结点至少有[m/2]个子女，根结点至少有两个子女；</li>
+<li>有k个子女的结点必有k个关键字。</li>
+</ol>
+<p>同样以度为5的B+树为例</p>
+<p>插入1-5是是这样的</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/oFgNhgrGey.png!large" alt="image-20220902192014275"></p>
+<p>可以看到与B树不同的是他将3存入了叶子节点</p>
+<p>而查找3时不同于B树 B+树会先找到根节点3而后向右子节点查找 找到在叶子节点中的3再返回</p>
+<p>那么问题来了 这样看来这B树不是更适合B+树？</p>
+<p>那么来看最后的结论</p>
+<hr>
+<h3 id="为何是B-而不是B"><a href="#为何是B-而不是B" class="headerlink" title="为何是B+而不是B"></a>为何是B+而不是B</h3><p>由于实际的mysql中我们是一条一条的记录，那么不止数字那么简单</p>
+<p>比如我们假设一个磁盘块为32K大小</p>
+<p>我们假设一个索引数字为1k，一条指针为1k（实际不会这么大只是方便演示），一条数据为4k</p>
+<p>那么如果我们用B树来存储</p>
+<p>那么一个磁盘块最多只能存储5条数据 （4+1）*5 + 6 = 31</p>
+<p>如下图所示</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202209/02/78240/FsQWz9xOME.png!large" alt="image-20220902194325384"></p>
+<p>那么如果树高为3 那么一共能存储</p>
+<p>5 * 6^0 + 5 * 6^1 + 5*6^2 = 95条数据</p>
+<p>那么我们看看B+树能存多少</p>
+<p>由于只存索引那么一行可以存下15条索引+16条指针</p>
+<p>那么树高为3 在第三行一共有16*16（256）个磁盘块 可以存储数据</p>
+<p>估算一下肯定远高于B树能存下的95条数据</p>
+<p>实际上InnoDB一颗B+树可以存放2kw条数据（当然取决于你主键类型）</p>
+<p>所以这就是为何选用B+树而不是B树的原因</p>
+<hr>
+<p>那么问题又来了</p>
+<p>为何会用B+树而不是用跳表呢？</p>
+<p>那为何redis又使用了跳表而mysql使用B+树呢</p>
+<p>请听下回分晓</p>
+</div></article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">Aroad阿路</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="http://aroad233.github.io/2022/09/03/为何mysql使用b+树作为索引/">http://aroad233.github.io/2022/09/03/为何mysql使用b+树作为索引/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://aroad233.github.io">阿路胡言乱语的小栈</a>！</span></div></div><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/mysql/">mysql</a></div><nav id="pagination"><div class="next-post pull-right"><a href="/2022/07/30/envLoad/"><span>envLoad</span><i class="fa fa-chevron-right"></i></a></div></nav></div></div><footer class="footer-bg" style="background-image: url(https://aroad.top/demo/banner2.png)"><div class="layout" id="footer"><div class="copyright">&copy;2021 - 2022 By Aroad阿路</div><div class="framework-info"><span>驱动 - </span><a target="_blank" rel="noopener" href="http://hexo.io"><span>Hexo</span></a><span class="footer-separator">|</span><span>主题 - </span><a target="_blank" rel="noopener" href="https://github.com/Molunerfinn/hexo-theme-melody"><span>Melody</span></a></div><div class="footer_custom_text">hitokoto</div><div class="busuanzi"><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><span id="busuanzi_container_page_pv"><i class="fa fa-file"></i><span id="busuanzi_value_page_pv"></span><span></span></span></div></div></footer><i class="fa fa-arrow-up" id="go-up" aria-hidden="true"></i><script src="https://cdn.jsdelivr.net/npm/animejs@latest/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js"></script><script src="https://cdn.jsdelivr.net/npm/velocity-animate@latest/velocity.min.js"></script><script src="https://cdn.jsdelivr.net/npm/velocity-ui-pack@latest/velocity.ui.min.js"></script><script src="/js/utils.js?version=1.9.0"></script><script src="/js/fancybox.js?version=1.9.0"></script><script src="/js/sidebar.js?version=1.9.0"></script><script src="/js/copy.js?version=1.9.0"></script><script src="/js/fireworks.js?version=1.9.0"></script><script src="/js/transition.js?version=1.9.0"></script><script src="/js/scroll.js?version=1.9.0"></script><script src="/js/head.js?version=1.9.0"></script><script>if(/Android|webOS|iPhone|iPod|iPad|BlackBerry/i.test(navigator.userAgent)) {
+  $('#nav').addClass('is-mobile')
+  $('footer').addClass('is-mobile')
+  $('#top-container').addClass('is-mobile')
+}</script></body></html>
